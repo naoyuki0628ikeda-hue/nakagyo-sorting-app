@@ -26,14 +26,15 @@ function setWard(ward) {
   });
 }
 
-function getWardOrder(wards) {
-  // 現場で使いやすい並び（必要に応じてここだけ変更）
-  const preferred = ["南区","西京区","下京区","山科区","東山区","右京区","中京区","上京区","北区","左京区","伏見区"];
-  const set = new Set(wards);
-  const ordered = [];
-  preferred.forEach((w) => { if (set.has(w)) ordered.push(w); });
-  wards.forEach((w) => { if (!ordered.includes(w)) ordered.push(w); });
-  return ordered;
+function getWardOrder(wardsInData) {
+  // ユーザー指定の固定表示（必ずこの10区を出す）
+  const fixed = ["中京区", "下京区", "東山区", "山科区", "右京区", "南区", "西京区", "北区", "上京区", "左京区"];
+  const set = new Set(wardsInData || []);
+  // データに無い区もボタンは表示（検索結果は0件になるだけ）
+  return fixed.map(w => ({
+    name: w,
+    hasData: set.has(w),
+  }));
 }
 
 function buildWardButtonsFromData() {
@@ -41,16 +42,9 @@ function buildWardButtonsFromData() {
   if (!box) return;
   box.innerHTML = "";
 
-  // DATAから区を抽出
-  const wards = Array.from(new Set(DATA.map(r => r.ward).filter(Boolean)));
-  const ordered = getWardOrder(wards);
+  const wardsInData = Array.from(new Set(DATA.map(r => r.ward).filter(Boolean)));
+  const ordered = getWardOrder(wardsInData); // [{name, hasData}, ...]
 
-  if (ordered.length === 0) {
-    box.innerHTML = '<span class="warn">区データが見つかりませんでした（data.json を確認）</span>';
-    return;
-  }
-
-  // 画像のレイアウトに合わせて「上段5個 + 下段残り」にする
   const top = ordered.slice(0, 5);
   const bottom = ordered.slice(5);
 
@@ -59,11 +53,18 @@ function buildWardButtonsFromData() {
   const row2 = document.createElement("div");
   row2.className = "wardRow";
 
-  function makeBtn(w){
+  function makeBtn(obj){
+    const w = obj.name;
     const btn = document.createElement("button");
     btn.type = "button";
     btn.textContent = w;
     btn.setAttribute("data-ward", w);
+
+    // データが無い区は薄く表示（それでも選択は可能）
+    if (!obj.hasData) {
+      btn.style.opacity = "0.5";
+    }
+
     btn.addEventListener("click", () => {
       setWard(w);
       $("zip").focus();
@@ -72,11 +73,11 @@ function buildWardButtonsFromData() {
     return btn;
   }
 
-  top.forEach((w) => row1.appendChild(makeBtn(w)));
-  if (bottom.length) bottom.forEach((w) => row2.appendChild(makeBtn(w)));
+  top.forEach((o) => row1.appendChild(makeBtn(o)));
+  bottom.forEach((o) => row2.appendChild(makeBtn(o)));
 
   box.appendChild(row1);
-  if (bottom.length) box.appendChild(row2);
+  box.appendChild(row2);
 
   setWard("");
 }
@@ -112,7 +113,7 @@ function showResult(matches, digits) {
   if (matches === null) {
     codeBox.textContent = "----";
     detail.style.display = "block";
-    detail.innerHTML = '<span class="warn">区を先に選んでください（下4桁検索）</span>';
+    detail.innerHTML = '<span class="warn">区を選択してください（郵便番号下4桁検索では必須）</span>';
     return;
   }
 
