@@ -1,248 +1,173 @@
-// 京都支店仕分けアプリ（シンプル現場版 / static hosting OK）
-let DATA = [];
-let READY = false;
-let SELECTED_WARD = "";
+(function(){
+  'use strict';
 
-const $ = (id) => document.getElementById(id);
+  const data = window.SORTING_DATA;
+  if(!data){ console.error('SORTING_DATA not found'); return; }
 
-function toast(msg) {
-  const t = $("toast");
-  t.textContent = msg;
-  t.style.display = "block";
-  clearTimeout(toast._timer);
-  toast._timer = setTimeout(() => (t.style.display = "none"), 1600);
-}
+  const wardButtonsEl = document.getElementById('wardButtons');
+  const selectedWardEl = document.getElementById('selectedWard');
+  const zipInput = document.getElementById('zipInput');
+  const clearBtn = document.getElementById('clearBtn');
 
-function normDigits(s) {
-  return (s || "").toString().normalize("NFKC").replace(/[^0-9]/g, "");
-}
+  const resultCodeEl = document.getElementById('resultCode');
+  const resultMetaEl = document.getElementById('resultMeta');
+  const errorsEl = document.getElementById('errors');
 
-function setWard(ward) {
-  SELECTED_WARD = ward || "";
-  $("wardSelected").textContent = SELECTED_WARD || "未選択";
-  document.querySelectorAll("#wards button[data-ward]").forEach((b) => {
-    const w = b.getAttribute("data-ward") || "";
-    b.classList.toggle("active", w === SELECTED_WARD);
-  });
-}
+  const candidatesWrap = document.getElementById('candidates');
+  const candidateListEl = document.getElementById('candidateList');
 
-function getWardOrder(wardsInData) {
-  // ユーザー指定の固定表示（必ずこの10区を出す）
-  const fixed = ["中京区", "下京区", "東山区", "山科区", "右京区", "南区", "西京区", "北区", "上京区", "左京区"];
-  const set = new Set(wardsInData || []);
-  // データに無い区もボタンは表示（検索結果は0件になるだけ）
-  return fixed.map(w => ({
-    name: w,
-    hasData: set.has(w),
-  }));
-}
+  let selectedWard = null;
 
-function buildWardButtonsFromData() {
-  const box = $("wards");
-  if (!box) return;
-  box.innerHTML = "";
-
-  const wardsInData = Array.from(new Set(DATA.map(r => r.ward).filter(Boolean)));
-  const ordered = getWardOrder(wardsInData); // [{name, hasData}, ...]
-
-  const top = ordered.slice(0, 5);
-  const bottom = ordered.slice(5);
-
-  const row1 = document.createElement("div");
-  row1.className = "wardRow";
-  const row2 = document.createElement("div");
-  row2.className = "wardRow";
-
-  function makeBtn(obj){
-    const w = obj.name;
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.textContent = w;
-    btn.setAttribute("data-ward", w);
-
-    // データが無い区は薄く表示（それでも選択は可能）
-    if (!obj.hasData) {
-      btn.style.opacity = "0.5";
+  function setError(msg){
+    errorsEl.textContent = msg || '';
+  }
+  function setResult(code, metaHtml){
+    resultCodeEl.textContent = code || '—';
+    resultMetaEl.innerHTML = metaHtml || '';
+  }
+  function setCandidates(list){
+    if(!list || list.length <= 1){
+      candidatesWrap.classList.add('hidden');
+      candidateListEl.innerHTML = '';
+      return;
     }
-
-    btn.addEventListener("click", () => {
-      setWard(w);
-      $("zip").focus();
-      doSearch(true); // 入力中なら自動で再検索
+    candidatesWrap.classList.remove('hidden');
+    candidateListEl.innerHTML = '';
+    list.forEach(item => {
+      const div = document.createElement('button');
+      div.type = 'button';
+      div.className = 'candidate';
+      div.innerHTML = `
+        <div class="c-code">仕分けCD：${escapeHtml(item.code)}</div>
+        <div class="c-ex">例：${escapeHtml((item.examples||[]).slice(0,5).join(' / '))}</div>
+      `;
+      div.addEventListener('click', () => {
+        setCandidates(null);
+        setError('');
+        setResult(item.code, `<span class="label">区：</span>${escapeHtml(selectedWard)}　<span class="label">入力：</span>${escapeHtml(getDigits(zipInput.value))}`);
+      });
+      candidateListEl.appendChild(div);
     });
-    return btn;
   }
 
-  top.forEach((o) => row1.appendChild(makeBtn(o)));
-  bottom.forEach((o) => row2.appendChild(makeBtn(o)));
-
-  box.appendChild(row1);
-  box.appendChild(row2);
-
-  setWard("");
-}
-
-function findMatches(digits) {
-  // 7桁以上：先頭7桁完全一致（区は任意）
-  if (digits.length >= 7) {
-    const z7 = digits.slice(0, 7);
-    return DATA.filter((r) => (r.postal || "") === z7);
+  function escapeHtml(str){
+    return String(str)
+      .replaceAll('&','&amp;')
+      .replaceAll('<','&lt;')
+      .replaceAll('>','&gt;')
+      .replaceAll('"','&quot;')
+      .replaceAll("'",'&#39;');
   }
 
-  // 4桁：末尾一致（区必須）
-  if (digits.length === 4) {
-    if (!SELECTED_WARD) return null; // 区が無い
-    return DATA.filter((r) => r.ward === SELECTED_WARD && (r.postal || "").endsWith(digits));
+  function getDigits(s){
+    return String(s||'').replace(/\D/g,'');
   }
 
-  // それ以外：誤入力防止（4桁 or 7桁のみ）
-  return [];
-}
-
-function showResult(matches, digits) {
-  const codeBox = $("codeBox");
-  const detail = $("detailBox");
-
-  if (!digits) {
-    codeBox.textContent = "----";
-    detail.style.display = "none";
-    detail.textContent = "";
-    return;
-  }
-
-  if (matches === null) {
-    codeBox.textContent = "----";
-    detail.style.display = "block";
-    detail.innerHTML = '<span class="warn">区を選択してください（郵便番号下4桁検索では必須）</span>';
-    return;
-  }
-
-  if (!matches.length) {
-    codeBox.textContent = "----";
-    detail.style.display = "block";
-    detail.textContent =
-      "該当なし（入力ミスの可能性）
-" +
-      "・下4桁：区を選択 → 4桁
-" +
-      "・7桁：そのまま7桁";
-    return;
-  }
-
-  if (matches.length === 1) {
-    const r = matches[0];
-    codeBox.textContent = r.code || "----";
-    detail.style.display = "block";
-    detail.textContent = `${r.ward || ""}
-${formatPostal(r.postal)}
-${r.address || ""}`;
-    return;
-  }
-
-  // 複数件：仕分けCDが共通なら表示、複数なら「要確認」
-  const codes = Array.from(new Set(matches.map(m => m.code).filter(Boolean)));
-  if (codes.length === 1) {
-    codeBox.textContent = codes[0];
-    detail.style.display = "block";
-    detail.textContent =
-      `同じ下4桁の候補が ${matches.length} 件ありますが、仕分けCDは共通です。
-` +
-      `区：${SELECTED_WARD || "（区指定なし）"} / 入力：${digits}
-` +
-      `（必要なら住所を目視で確認）`;
-  } else {
-    codeBox.textContent = "要確認";
-    detail.style.display = "block";
-    detail.textContent =
-      `同じ下4桁でも仕分けCDが複数あります（${codes.join(", ")}）。
-` +
-      `7桁郵便番号で検索してください。`;
-  }
-}
-
-function formatPostal(p) {
-  const d = normDigits(p);
-  return d.length === 7 ? d.slice(0,3) + "-" + d.slice(3) : d;
-}
-
-async function loadData() {
-  $("status").textContent = "データ読み込み中…";
-  try {
-    const res = await fetch("./data.json", { cache: "no-store" });
-    if (!res.ok) throw new Error("data.json 読み込み失敗");
-    DATA = await res.json();
-    READY = true;
-    $("status").textContent = `読み込み完了：${DATA.length.toLocaleString()} 件`;
-    buildWardButtonsFromData();
-  } catch (e) {
-    console.error(e);
-    $("status").textContent = "エラー：データ読み込みに失敗しました（data.json の配置を確認）";
-  }
-}
-
-function doSearch(silent=false) {
-  if (!READY) return;
-  const digits = normDigits($("zip").value);
-
-  // 4桁 or 7桁以上 以外はガイド表示
-  if (!(digits.length === 4 || digits.length >= 7) && digits.length > 0) {
-    showResult([], digits);
-    if (!silent) toast("4桁（下4桁）か 7桁（郵便番号）で入力してください");
-    return;
-  }
-
-  const matches = findMatches(digits);
-  showResult(matches, digits);
-}
-
-function clearAll() {
-  $("zip").value = "";
-  showResult([], "");
-  $("zip").focus();
-}
-
-function setupCopy() {
-  $("codeBox").addEventListener("click", async () => {
-    const v = ($("codeBox").textContent || "").trim();
-    if (!v || v === "----" || v === "要確認") return;
-    try {
-      await navigator.clipboard.writeText(v);
-      toast("コピーしました：" + v);
-    } catch {
-      const ta = document.createElement("textarea");
-      ta.value = v;
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand("copy");
-      document.body.removeChild(ta);
-      toast("コピーしました：" + v);
+  function normalizeInputDigits(digits){
+    // allow 4,5,7
+    if(digits.length >= 7){
+      return {key5: digits.slice(-5), key4: digits.slice(-4), usedLen: 5, shown: digits.slice(-5)};
     }
+    if(digits.length === 5){
+      return {key5: digits, key4: digits.slice(-4), usedLen: 5, shown: digits};
+    }
+    if(digits.length === 4){
+      return {key5: null, key4: digits, usedLen: 4, shown: digits};
+    }
+    if(digits.length > 5 && digits.length < 7){
+      // 6 digits: use last5
+      return {key5: digits.slice(-5), key4: digits.slice(-4), usedLen: 5, shown: digits.slice(-5)};
+    }
+    return null;
+  }
+
+  function lookup(){
+    setError('');
+    setCandidates(null);
+
+    if(!selectedWard){
+      setResult('—', '');
+      const d = getDigits(zipInput.value);
+      if(d.length >= 1) setError('まず区を選択してください。');
+      return;
+    }
+
+    const digits = getDigits(zipInput.value);
+    if(digits.length === 0){
+      setResult('—', '');
+      return;
+    }
+
+    const norm = normalizeInputDigits(digits);
+    if(!norm || (digits.length < 4)){
+      setResult('—', '');
+      setError('4桁または5桁（または7桁）で入力してください。');
+      return;
+    }
+
+    // Prefer 5-digit key if available; otherwise 4-digit.
+    const map5 = data.suffixMaps && data.suffixMaps['5'] && data.suffixMaps['5'][selectedWard];
+    const map4 = data.suffixMaps && data.suffixMaps['4'] && data.suffixMaps['4'][selectedWard];
+
+    let entries = null;
+    let used = null;
+
+    if(norm.key5 && map5 && map5[norm.key5]){
+      entries = map5[norm.key5];
+      used = 5;
+    }else if(map4 && map4[norm.key4]){
+      entries = map4[norm.key4];
+      used = 4;
+    }
+
+    if(!entries){
+      setResult('—', `<span class="label">区：</span>${escapeHtml(selectedWard)}　<span class="label">入力：</span>${escapeHtml(norm.shown)}`);
+      setError('該当なし（データにない郵便番号、または区が違う可能性があります）。');
+      return;
+    }
+
+    // If multiple candidates, show list; otherwise show the single code.
+    if(entries.length > 1){
+      setResult('—', `<span class="label">区：</span>${escapeHtml(selectedWard)}　<span class="label">入力：</span>${escapeHtml(norm.shown)}　<span class="label">判定：</span>${used}桁（候補あり）`);
+      setCandidates(entries);
+      return;
+    }
+
+    const code = entries[0].code;
+    setResult(code, `<span class="label">区：</span>${escapeHtml(selectedWard)}　<span class="label">入力：</span>${escapeHtml(norm.shown)}　<span class="label">判定：</span>${used}桁`);
+  }
+
+  function renderWards(){
+    wardButtonsEl.innerHTML = '';
+    data.wards.forEach(w => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'ward-btn';
+      btn.textContent = w.name;
+      btn.addEventListener('click', () => {
+        selectedWard = w.name;
+        // update styles
+        [...wardButtonsEl.querySelectorAll('.ward-btn')].forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        selectedWardEl.textContent = selectedWard;
+        lookup(); // re-run
+        zipInput.focus();
+      });
+      wardButtonsEl.appendChild(btn);
+    });
+  }
+
+  // Events
+  zipInput.addEventListener('input', () => lookup());
+  clearBtn.addEventListener('click', () => {
+    zipInput.value = '';
+    setError('');
+    setCandidates(null);
+    setResult('—','');
+    zipInput.focus();
   });
-}
 
-window.addEventListener("DOMContentLoaded", async () => {
-  await loadData();
-  setupCopy();
-
-  
-  $("clearWard").addEventListener("click", () => {
-    setWard("");
-    $("zip").focus();
-    doSearch(true);
-  });
-
-  // 入力中に自動検索：4桁 or 7桁以上で即表示
-  $("zip").addEventListener("input", () => {
-    const d = normDigits($("zip").value);
-    if (d.length === 0) showResult([], "");
-    else if (d.length === 4 || d.length >= 7) doSearch(true);
-    else doSearch(true); // 途中でもガイドを出す（迷い防止）
-  });
-
-  $("zip").addEventListener("keydown", (e) => {
-    if (e.key === "Enter") doSearch(false);
-    if (e.key === "Escape") clearAll();
-  });
-
-  $("zip").focus();
-});
+  // Init
+  renderWards();
+  setResult('—','');
+})();

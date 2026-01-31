@@ -1,153 +1,69 @@
 <!doctype html>
 <html lang="ja">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>京都支店仕分けアプリ</title>
-  <style>
-    body{
-      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-      background:#fff;
-      color:#000;
-      margin:0;
-      padding:0;
-    }
-    .wrap{
-      max-width: 680px;
-      margin: 0 auto;
-      padding: 46px 26px 60px;
-    }
-    h1{
-      text-align:center;
-      font-size: 34px;
-      font-weight: 600;
-      margin: 0 0 56px;
-      letter-spacing: .08em;
-    }
-    .block{ margin: 0 0 52px; }
-    .label{
-      display:block;
-      font-size: 18px;
-      margin: 0 0 14px;
-    }
-    .wards{
-      display:flex;
-      flex-wrap:wrap;
-      gap: 16px 0;
-      width: 100%;
-    }
-    .wardRow{
-      display:flex;
-      gap: 0;
-      width: 100%;
-      justify-content: flex-start;
-    }
-    .wards button{
-      min-width: 86px;
-      padding: 10px 14px;
-      font-size: 16px;
-      border: 1.5px solid #000;
-      background:#fff;
-      cursor:pointer;
-      border-radius: 0;
-      margin-right: -1.5px; /* make borders look connected */
-    }
-    .wards button.active{
-      background:#000;
-      color:#fff;
-    }
-    .controls{
-      display:flex;
-      align-items:center;
-      gap: 14px;
-      margin-top: 10px;
-    }
-    .btn{
-      padding: 10px 14px;
-      font-size: 14px;
-      border: 1.5px solid #000;
-      background:#fff;
-      cursor:pointer;
-      border-radius: 0;
-      font-weight: 600;
-    }
-    input{
-      width: 100%;
-      font-size: 22px;
-      padding: 14px 14px;
-      border: 2px solid #000;
-      border-radius: 0;
-      box-sizing: border-box;
-    }
-    .result{
-      width: 100%;
-      font-size: 26px;
-      font-weight: 800;
-      padding: 16px 14px;
-      border: 2px solid #000;
-      border-radius: 0;
-      min-height: 54px;
-      box-sizing: border-box;
-      display:flex;
-      align-items:center;
-    }
-    .subresult{
-      margin-top: 10px;
-      font-size: 13px;
-      line-height: 1.5;
-      white-space: pre-wrap;
-      color:#111;
-    }
-    .toast{
-      position: fixed;
-      left: 50%;
-      transform: translateX(-50%);
-      bottom: 16px;
-      background: rgba(0,0,0,.9);
-      color:#fff;
-      padding: 10px 12px;
-      font-size: 13px;
-      display:none;
-      max-width: min(680px, 92vw);
-      text-align:center;
-    }
-    .small{ font-size: 13px; color:#555; }
-    .warn{ color:#b91c1c; font-weight: 700; }
-  </style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>京都 支店仕分け（郵便番号→仕分けCD）</title>
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div class="wrap">
-    <h1>京都支店仕分けアプリ</h1>
+  <main class="wrap">
+    <header class="header">
+      <h1>京都 支店仕分け</h1>
+      <p class="sub">郵便番号の下4〜5桁から、仕分けCDを表示します（伏見区は対象外）。</p>
+    </header>
 
-    <div class="block">
-      <span class="label">区を選択する</span>
-      <div class="wards" id="wards">
-        <!-- JSでボタン生成 -->
+    <section class="card">
+      <h2>① 区を選択</h2>
+      <p class="hint">先に区を選択してください。区を選択しないと判別できません。</p>
+      <div id="wardButtons" class="ward-grid" aria-label="区の選択"></div>
+      <div class="selected">
+        <span class="label">選択中：</span>
+        <span id="selectedWard" class="value">未選択</span>
       </div>
-      <div class="controls">
-        <div class="small">選択中：<b id="wardSelected">未選択</b></div>
-        <button class="btn" id="clearWard" type="button">未選択に戻す</button>
+    </section>
+
+    <section class="card">
+      <h2>② 郵便番号（下4〜5桁）を入力</h2>
+      <p class="hint">伝票に書かれた郵便番号の<strong>下4〜5桁</strong>を入力してください。<br/>
+      7桁を入力してもOKです（自動で下5桁を使います）。</p>
+
+      <div class="row">
+        <input id="zipInput" inputmode="numeric" autocomplete="off" placeholder="例：08493 / 8493 / 6008493" />
+        <button id="clearBtn" class="btn" type="button" aria-label="クリア">クリア</button>
       </div>
-      <div class="small" style="margin-top:10px;">
-        ※ 下4桁検索は区の選択が必要です（7桁入力なら区なしでもOK）
+
+      <div id="result" class="result" role="status" aria-live="polite">
+        <div class="result-line">
+          <span class="label">仕分けCD：</span>
+          <span id="resultCode" class="code">—</span>
+        </div>
+        <div id="resultMeta" class="meta"></div>
       </div>
-    </div>
 
-    <div class="block">
-      <span class="label">郵便番号入力</span>
-      <input id="zip" inputmode="numeric" autocomplete="off" placeholder="例：8098（下4桁） / 6008098（7桁）" maxlength="8">
-      <div class="small" id="status" style="margin-top:10px;">データ読み込み中…</div>
-    </div>
+      <div id="candidates" class="candidates hidden">
+        <h3>候補が複数あります</h3>
+        <p class="hint">同じ郵便番号でも、担当エリアが複数に分かれている場合があります。該当するものを選択してください。</p>
+        <div id="candidateList" class="candidate-list"></div>
+      </div>
 
-    <div class="block">
-      <span class="label">仕分けCD</span>
-      <div class="result" id="codeBox">----</div>
-      <div class="subresult" id="detailBox" style="display:none;"></div>
-      <div class="small" style="margin-top:10px;">※ 仕分けCDをタップするとコピーできます</div>
-    </div>
-  </div>
+      <div id="errors" class="errors" aria-live="polite"></div>
+    </section>
 
-  <div id="toast" class="toast"></div>
-  <script src="./app.js"></script>
+    <footer class="footer">
+      <details>
+        <summary>使い方（短く）</summary>
+        <ol>
+          <li>区をタップして選択</li>
+          <li>郵便番号の下4〜5桁を入力（検索ボタン不要）</li>
+          <li>仕分けCDが表示されます</li>
+        </ol>
+      </details>
+      <p class="tiny">データ：仕分CD.xlsx（B:住所 / C:郵便番号 / D:仕分けコード）</p>
+    </footer>
+  </main>
+
+  <script src="data.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>
