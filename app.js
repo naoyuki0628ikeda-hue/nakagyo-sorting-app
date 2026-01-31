@@ -46,12 +46,20 @@ function buildWardButtonsFromData() {
   const ordered = getWardOrder(wards);
 
   if (ordered.length === 0) {
-    // データに区情報が無い場合の安全策
     box.innerHTML = '<span class="warn">区データが見つかりませんでした（data.json を確認）</span>';
     return;
   }
 
-  ordered.forEach((w) => {
+  // 画像のレイアウトに合わせて「上段5個 + 下段残り」にする
+  const top = ordered.slice(0, 5);
+  const bottom = ordered.slice(5);
+
+  const row1 = document.createElement("div");
+  row1.className = "wardRow";
+  const row2 = document.createElement("div");
+  row2.className = "wardRow";
+
+  function makeBtn(w){
     const btn = document.createElement("button");
     btn.type = "button";
     btn.textContent = w;
@@ -59,11 +67,16 @@ function buildWardButtonsFromData() {
     btn.addEventListener("click", () => {
       setWard(w);
       $("zip").focus();
-      // 入力中なら自動で再検索
-      doSearch(true);
+      doSearch(true); // 入力中なら自動で再検索
     });
-    box.appendChild(btn);
-  });
+    return btn;
+  }
+
+  top.forEach((w) => row1.appendChild(makeBtn(w)));
+  if (bottom.length) bottom.forEach((w) => row2.appendChild(makeBtn(w)));
+
+  box.appendChild(row1);
+  if (bottom.length) box.appendChild(row2);
 
   setWard("");
 }
@@ -210,10 +223,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   await loadData();
   setupCopy();
 
-  // 検索ボタンは残すが、入力だけで自動表示（タップ削減）
-  $("searchBtn").addEventListener("click", () => doSearch(false));
-  $("resetBtn").addEventListener("click", clearAll);
-
+  
   $("clearWard").addEventListener("click", () => {
     setWard("");
     $("zip").focus();

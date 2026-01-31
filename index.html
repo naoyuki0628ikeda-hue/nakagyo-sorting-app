@@ -5,101 +5,100 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>京都支店仕分けアプリ</title>
   <style>
-    body {
+    body{
       font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-      background: #fff;
-      color: #000;
-      margin: 0;
-      padding: 22px;
+      background:#fff;
+      color:#000;
+      margin:0;
+      padding:0;
     }
-    h1 {
-      text-align: center;
-      margin: 10px 0 28px;
-      font-size: 28px;
-      letter-spacing: .06em;
+    .wrap{
+      max-width: 680px;
+      margin: 0 auto;
+      padding: 46px 26px 60px;
     }
-    .block { margin-bottom: 26px; }
-    .label {
-      font-weight: 800;
-      margin-bottom: 8px;
-      display: block;
-      font-size: 16px;
+    h1{
+      text-align:center;
+      font-size: 34px;
+      font-weight: 600;
+      margin: 0 0 56px;
+      letter-spacing: .08em;
     }
-    .help {
-      font-size: 14px;
-      color: #333;
-      margin-bottom: 10px;
-      line-height: 1.5;
+    .block{ margin: 0 0 52px; }
+    .label{
+      display:block;
+      font-size: 18px;
+      margin: 0 0 14px;
     }
-    .wards {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px 14px;
-      align-items: center;
-    }
-    .wards button {
-      padding: 10px 16px;
-      font-size: 16px;
-      border: 1.8px solid #000;
-      background: #fff;
-      cursor: pointer;
-      border-radius: 4px;
-    }
-    .wards button.active {
-      background: #000;
-      color: #fff;
-    }
-    .row {
+    .wards{
       display:flex;
-      gap: 14px;
-      align-items:center;
-      flex-wrap: wrap;
+      flex-wrap:wrap;
+      gap: 16px 0;
+      width: 100%;
     }
-    input {
-      width: min(640px, 100%);
-      font-size: 22px;
-      padding: 12px;
-      box-sizing: border-box;
-      border: 2px solid #000;
-      border-radius: 4px;
+    .wardRow{
+      display:flex;
+      gap: 0;
+      width: 100%;
+      justify-content: flex-start;
     }
-    .btn {
-      padding: 12px 14px;
+    .wards button{
+      min-width: 86px;
+      padding: 10px 14px;
       font-size: 16px;
-      border: 2px solid #000;
+      border: 1.5px solid #000;
       background:#fff;
       cursor:pointer;
-      border-radius: 4px;
-      font-weight: 800;
+      border-radius: 0;
+      margin-right: -1.5px; /* make borders look connected */
     }
-    .btn.primary {
+    .wards button.active{
       background:#000;
       color:#fff;
     }
-    .small {
-      font-size: 13px;
-      color:#555;
-    }
-    .result {
-      font-size: 34px;
-      font-weight: 900;
-      padding: 18px 16px;
-      border: 2px solid #000;
-      min-height: 1.6em;
-      border-radius: 4px;
-      letter-spacing: .06em;
-    }
-    .subresult {
+    .controls{
+      display:flex;
+      align-items:center;
+      gap: 14px;
       margin-top: 10px;
-      padding: 10px 12px;
-      border: 1px solid #000;
-      border-radius: 4px;
-      font-size: 14px;
-      line-height: 1.5;
-      color:#111;
-      white-space: pre-wrap;
     }
-    .toast {
+    .btn{
+      padding: 10px 14px;
+      font-size: 14px;
+      border: 1.5px solid #000;
+      background:#fff;
+      cursor:pointer;
+      border-radius: 0;
+      font-weight: 600;
+    }
+    input{
+      width: 100%;
+      font-size: 22px;
+      padding: 14px 14px;
+      border: 2px solid #000;
+      border-radius: 0;
+      box-sizing: border-box;
+    }
+    .result{
+      width: 100%;
+      font-size: 26px;
+      font-weight: 800;
+      padding: 16px 14px;
+      border: 2px solid #000;
+      border-radius: 0;
+      min-height: 54px;
+      box-sizing: border-box;
+      display:flex;
+      align-items:center;
+    }
+    .subresult{
+      margin-top: 10px;
+      font-size: 13px;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      color:#111;
+    }
+    .toast{
       position: fixed;
       left: 50%;
       transform: translateX(-50%);
@@ -107,53 +106,45 @@
       background: rgba(0,0,0,.9);
       color:#fff;
       padding: 10px 12px;
-      border-radius: 10px;
       font-size: 13px;
       display:none;
       max-width: min(680px, 92vw);
       text-align:center;
     }
-    .warn {
-      color:#b91c1c;
-      font-weight: 800;
-    }
+    .small{ font-size: 13px; color:#555; }
+    .warn{ color:#b91c1c; font-weight: 700; }
   </style>
 </head>
 <body>
-  <h1>京都支店仕分けアプリ</h1>
+  <div class="wrap">
+    <h1>京都支店仕分けアプリ</h1>
 
-  <div class="block">
-    <span class="label">① 区を選択する</span>
-    <div class="help">
-      郵便番号は <b>下4桁だけ</b> で検索できます。<br>
-      下4桁だけだと区が判別できないため、<b>先に区を選んで</b>ください。
+    <div class="block">
+      <span class="label">区を選択する</span>
+      <div class="wards" id="wards">
+        <!-- JSでボタン生成 -->
+      </div>
+      <div class="controls">
+        <div class="small">選択中：<b id="wardSelected">未選択</b></div>
+        <button class="btn" id="clearWard" type="button">未選択に戻す</button>
+      </div>
+      <div class="small" style="margin-top:10px;">
+        ※ 下4桁検索は区の選択が必要です（7桁入力なら区なしでもOK）
+      </div>
     </div>
-    <div class="wards" id="wards"></div>
-    <div class="small" style="margin-top:10px;">
-      選択中：<b id="wardSelected">未選択</b>　
-      <button class="btn" id="clearWard" type="button">未選択に戻す</button>
-    </div>
-  </div>
 
-  <div class="block">
-    <span class="label">② 郵便番号（下4桁）を入力</span>
-    <div class="help">
-      例：<b>600-8098 → 8098</b><br>
-      ※ 7桁入力（例：6008098）もOK（その場合は区を選ばなくても検索できます）
+    <div class="block">
+      <span class="label">郵便番号入力</span>
+      <input id="zip" inputmode="numeric" autocomplete="off" placeholder="例：8098（下4桁） / 6008098（7桁）" maxlength="8">
+      <div class="small" id="status" style="margin-top:10px;">データ読み込み中…</div>
     </div>
-    <div class="row">
-      <input id="zip" inputmode="numeric" autocomplete="off" placeholder="例：8098" maxlength="8">
-      <button class="btn primary" id="searchBtn" type="button">検索</button>
-      <button class="btn" id="resetBtn" type="button">クリア</button>
-    </div>
-    <div class="small" id="status" style="margin-top:10px;">データ読み込み中…</div>
-  </div>
 
-  <div class="block">
-    <span class="label">③ 仕分けCD</span>
-    <div class="help">表示された数字を荷物に記入してください（タップでコピーできます）。</div>
-    <div class="result" id="codeBox">----</div>
-    <div class="subresult" id="detailBox" style="display:none;"></div>
+    <div class="block">
+      <span class="label">仕分けCD</span>
+      <div class="result" id="codeBox">----</div>
+      <div class="subresult" id="detailBox" style="display:none;"></div>
+      <div class="small" style="margin-top:10px;">※ 仕分けCDをタップするとコピーできます</div>
+    </div>
   </div>
 
   <div id="toast" class="toast"></div>
