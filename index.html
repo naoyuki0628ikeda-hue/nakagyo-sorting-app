@@ -36,7 +36,7 @@
 <body>
   <header>
     <h1>京都支店仕分けアプリ</h1>
-    <p>住所・郵便番号・仕分けコードで検索できます（データはローカル読み込み）</p>
+    <p>住所・郵便番号・仕分けコードで検索できます（郵便番号は下4桁検索にも対応）</p>
   </header>
 
   <main>
@@ -60,7 +60,17 @@
         </div>
       </div>
 
-      <div class="meta">
+      
+      <div style="margin-top: 12px;">
+        <label>区を選ぶ（郵便番号下4桁検索で使用）</label>
+        <div id="wardBar" class="modes" style="margin-top:8px;"></div>
+        <div class="meta" style="margin-top:8px;">
+          <small>選択中：<b id="wardSelected">未選択</b></small>
+          <small class="muted">郵便番号モードで <b>下4桁</b> を入力すると、選択した区の中から検索します</small>
+        </div>
+      </div>
+
+<div class="meta">
         <small id="status" class="muted">データ読み込み中…</small>
         <small class="muted">ヒント：住所検索はスペース区切りでAND検索（全部含むものを表示）</small>
       </div>
